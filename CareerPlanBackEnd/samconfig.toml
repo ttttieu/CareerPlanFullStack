@@ -1,0 +1,11 @@
+version = 0.1
+[default.deploy.parameters]
+stack_name = "CareerPlanBackend"
+resolve_s3 = true
+s3_prefix = "CareerPlanBackend"
+region = "ap-southeast-2"
+capabilities = "CAPABILITY_IAM"
+disable_rollback = true
+parameter_overrides = "FirebaseAdminSecretName=\"careerplan/firebase_admin_key\""
+image_repositories = []
+confirm_changeset = true

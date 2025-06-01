@@ -1,0 +1,17 @@
+{
+  "name": "complete-student-profile-lambda",
+  "version": "1.0.0",
+  "description": "Lambda function to complete student profile and update Firebase Custom Claims",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.817.0",
+    "firebase-admin": "^13.4.0"
+  }
+}

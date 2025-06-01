@@ -1,0 +1,16 @@
+{
+  "name": "careerplan-backend",
+  "version": "1.0.0",
+  "description": "Backend for CareerPlan project",
+  "main": "index.js",
+  "dependencies": {
+    "aws-sdk": "^2.x.x", 
+    "firebase-admin": "^11.x.x" 
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "CareerPlan.vn",
+  "license": "ISC"
+}

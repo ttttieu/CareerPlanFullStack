@@ -1,0 +1,122 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: CareerPlan Backend API - A serverless application for CareerPlan project.
+
+Parameters:
+  FirebaseAdminSecretName:
+    Type: String
+    Description: Name of the AWS Secrets Manager secret storing the Firebase Admin SDK key.
+    Default: careerplan/firebase_admin_key 
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 256
+    Runtime: nodejs20.x
+    Tracing: Active
+  Api:
+    Cors:
+      AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+      AllowMethods: "'OPTIONS,POST,GET'"
+      AllowOrigin: "'*'" 
+    Authorizers:
+      CustomFirebaseAuthorizer: # <--- Tên logic của Authorizer này, sẽ được tham chiếu từ các API Events
+        FunctionArn: !GetAtt CustomLambdaAuthorizer.Arn # <--- Trỏ đến ARN của Lambda Authorizer
+        # Identity: # Cấu hình tùy chọn cho Authorizer
+        #   Headers:
+        #     - Authorization # Authorizer sẽ kiểm tra header Authorization
+        # ResultTtlInSeconds: 300 # Cache kết quả xác thực trong 300 giây (tùy chọn)
+
+Resources:
+  LeadsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: CareerPlanLeads 
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+  CustomLambdaAuthorizer:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/auth/authLambdaAuthorizer.handler # Trỏ đến file và hàm handler
+      Runtime: nodejs20.x
+      MemorySize: 128 # Authorizer thường không cần nhiều bộ nhớ
+      Timeout: 10 # Thời gian timeout ngắn hơn
+      Environment:
+        Variables:
+          FIREBASE_ADMIN_SECRET_NAME: !Ref FirebaseAdminSecretName # Truyền tên secret
+      Policies:
+        # Quyền truy cập Secrets Manager để lấy Firebase Admin Key
+        - Statement:
+            Effect: Allow
+            Action:
+              - secretsmanager:GetSecretValue
+            Resource: !Sub "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${FirebaseAdminSecretName}"
+  CompleteStudentProfileLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      CodeUri: functions/completeStudentProfileLambda/ 
+      Environment:
+        Variables:
+          
+          TABLE_NAME: !Ref LeadsTable 
+          FIREBASE_ADMIN_SECRET_NAME: !Ref FirebaseAdminSecretName 
+      Policies:
+       
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LeadsTable
+       
+        - Statement:
+            Effect: Allow
+            Action:
+              - secretsmanager:GetSecretValue
+            Resource: !Sub "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${FirebaseAdminSecretName}"
+            
+      Events:
+        CompleteProfileApi:
+          Type: Api
+          Properties:
+            Path: /complete-profile
+            Method: post           
+  GetUserProfileFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/user/getUserProfile.handler # Sẽ tạo file này sau
+      Runtime: nodejs20.x
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref UserProfilesTable # Bảng UserProfiles của bạn
+      Events:
+        GetUserProfileApi:
+          Type: Api
+          Properties:
+            Path: /api/user/profile
+            Method: get
+            Auth: # <-- Đây là cách bạn gán Authorizer
+              Authorizer: !Ref CustomLambdaAuthorizer # Tham chiếu đến Authorizer đã định nghĩa
+              # Để bắt buộc xác thực, thêm:
+              # ResultTtlInSeconds: 300 # Cache kết quả xác thực trong 300 giây (tùy chọn)
+
+  # Định nghĩa UserProfilesTable (nếu bạn chưa định nghĩa trong template.yaml)
+  UserProfilesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: UserProfiles
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+Outputs:
+  CompleteStudentProfileApi:
+    Description: "API Gateway endpoint URL for Complete Student Profile function"
+    Value:
+      Fn::Sub: "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/complete-profile"
